@@ -1,6 +1,6 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"; // 注意: signInWithCustomTokenは不要になりました
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // あなたのウェブアプリのFirebase設定
@@ -11,15 +11,13 @@
         storageBucket: "cocorone-f0ea6.firebasestorage.app",
         messagingSenderId: "609967939636",
         appId: "1:609967939636:web:ef26d301b9edc37dbcaa61",
-        measurementId: "G-6FH0X32X6H" // これはAnalytics用なので、カウンター動作には直接影響しませんが、含めても問題ありません
+        measurementId: "G-6FH0X32X6H"
     };
 
-    const app = initializeApp(firebaseConfig); // Firebaseの初期化
-    // const analytics = getAnalytics(app); // カウンターには不要なので削除してもOK
-
+    const app = initializeApp(firebaseConfig);
+    
     // カウンターが使用するappIdはprojectIdとする
-    const appId = firebaseConfig.projectId; // ★追加・修正
-    // const initialAuthToken = null; // ★これは不要なので削除します (CustomToken認証は使いません)
+    const appId = firebaseConfig.projectId;
 
     let db;
     let auth;
@@ -27,11 +25,10 @@
     // Firebaseの初期化と認証
     const initializeFirebase = async () => {
         try {
-            // appは上でinitializeApp済みなので、ここでは不要
-            db = getFirestore(app); // appを引数に渡す
-            auth = getAuth(app); // appを引数に渡す
+            db = getFirestore(app);
+            auth = getAuth(app);
 
-            await signInAnonymously(auth); // 匿名認証を使用
+            await signInAnonymously(auth);
             console.log('Firebase: Signed in anonymously.');
 
         } catch (error) {
@@ -49,12 +46,26 @@
         }
 
         // Firestoreのパスを修正: appIdの代わりにfirebaseConfig.projectIdを使用
-        const counterRef = doc(db, 'artifacts', firebaseConfig.projectId, 'public', 'data', 'web_counters', 'main_counter'); // ★修正
-
+        const counterRef = doc(db, 'artifacts', firebaseConfig.projectId, 'public', 'data', 'web_counters', 'main_counter');
         let currentCount = 0;
 
         try {
-            // ... (この後のコードは変更なし) ...
+            // トランザクションを使用して安全にカウントを更新
+            // getDocで現在の値を取得し、incrementで更新
+            const docSnap = await getDoc(counterRef);
+
+            if (docSnap.exists()) {
+                currentCount = docSnap.data().count;
+                await updateDoc(counterRef, {
+                    count: increment(1)
+                });
+                currentCount++; // 表示用にインクリメント
+            } else {
+                // ドキュメントが存在しない場合は新規作成
+                await setDoc(counterRef, { count: 1 });
+                currentCount = 1;
+            }
+            document.getElementById('viewCount').textContent = currentCount;
         } catch (error) {
             console.error("カウンターの更新エラー:", error);
             document.getElementById('viewCount').textContent = 'エラー';
@@ -64,7 +75,10 @@
     // ページ読み込み時にFirebaseを初期化し、カウンターを更新
     document.addEventListener('DOMContentLoaded', async () => {
         await initializeFirebase();
-        // 匿名認証は常に成功すると仮定して、認証チェックは簡略化
-        await updateCounter();
+        if (auth.currentUser) { // 認証が成功した場合のみカウンターを更新
+            await updateCounter();
+        } else {
+            document.getElementById('viewCount').textContent = '認証エラー'; // 匿名認証が失敗した場合
+        }
     });
 </script>
