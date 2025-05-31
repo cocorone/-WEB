@@ -1,124 +1,70 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ウェブカウンター</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Interフォントを適用 */
-        body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh; /* ウィジェットが小さくても中央に表示されるように */
-            background-color: transparent; /* Notionの背景に合わせるため透明に */
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"; // 注意: signInWithCustomTokenは不要になりました
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // あなたのウェブアプリのFirebase設定
+    const firebaseConfig = {
+        apiKey: "AIzaSyDbQiwT1_DJhoPdV-HRFkN0QM1MC08trJc",
+        authDomain: "cocorone-f0ea6.firebaseapp.com",
+        projectId: "cocorone-f0ea6",
+        storageBucket: "cocorone-f0ea6.firebasestorage.app",
+        messagingSenderId: "609967939636",
+        appId: "1:609967939636:web:ef26d301b9edc37dbcaa61",
+        measurementId: "G-6FH0X32X6H" // これはAnalytics用なので、カウンター動作には直接影響しませんが、含めても問題ありません
+    };
+
+    const app = initializeApp(firebaseConfig); // Firebaseの初期化
+    // const analytics = getAnalytics(app); // カウンターには不要なので削除してもOK
+
+    // カウンターが使用するappIdはprojectIdとする
+    const appId = firebaseConfig.projectId; // ★追加・修正
+    // const initialAuthToken = null; // ★これは不要なので削除します (CustomToken認証は使いません)
+
+    let db;
+    let auth;
+
+    // Firebaseの初期化と認証
+    const initializeFirebase = async () => {
+        try {
+            // appは上でinitializeApp済みなので、ここでは不要
+            db = getFirestore(app); // appを引数に渡す
+            auth = getAuth(app); // appを引数に渡す
+
+            await signInAnonymously(auth); // 匿名認証を使用
+            console.log('Firebase: Signed in anonymously.');
+
+        } catch (error) {
+            console.error("Firebaseの初期化または認証エラー:", error);
+            document.getElementById('viewCount').textContent = 'エラー';
         }
-        .counter-container {
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            background-color: #f8f8f8; /* Notionのカード背景に近い色 */
-            border: 1px solid #e0e0e0; /* Notionの枠線に近い色 */
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* 控えめな影 */
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 1.25rem; /* text-xl */
-            font-weight: 600; /* font-semibold */
-            color: #333;
+    };
+
+    // カウンターの更新処理
+    const updateCounter = async () => {
+        if (!db) {
+            console.error("Firestoreが初期化されていません。");
+            document.getElementById('viewCount').textContent = 'エラー';
+            return;
         }
-        .counter-label {
-            color: #666;
-            font-size: 1rem; /* text-base */
-            font-weight: 400; /* font-normal */
+
+        // Firestoreのパスを修正: appIdの代わりにfirebaseConfig.projectIdを使用
+        const counterRef = doc(db, 'artifacts', firebaseConfig.projectId, 'public', 'data', 'web_counters', 'main_counter'); // ★修正
+
+        let currentCount = 0;
+
+        try {
+            // ... (この後のコードは変更なし) ...
+        } catch (error) {
+            console.error("カウンターの更新エラー:", error);
+            document.getElementById('viewCount').textContent = 'エラー';
         }
-    </style>
-</head>
-<body>
-    <div id="counter-app" class="counter-container">
-        <span class="counter-label">閲覧数:</span>
-        <span id="viewCount" class="text-xl font-semibold text-blue-600">読み込み中...</span>
-    </div>
+    };
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase設定はCanvas環境から提供されます
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        let app;
-        let db;
-        let auth;
-
-        // Firebaseの初期化と認証
-        const initializeFirebase = async () => {
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                    console.log('Firebase: Custom token signed in.');
-                } else {
-                    await signInAnonymously(auth);
-                    console.log('Firebase: Signed in anonymously.');
-                }
-            } catch (error) {
-                console.error("Firebaseの初期化または認証エラー:", error);
-                document.getElementById('viewCount').textContent = 'エラー';
-            }
-        };
-
-        // カウンターの更新処理
-        const updateCounter = async () => {
-            if (!db) {
-                console.error("Firestoreが初期化されていません。");
-                document.getElementById('viewCount').textContent = 'エラー';
-                return;
-            }
-
-            const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'web_counters', 'main_counter');
-            let currentCount = 0;
-
-            try {
-                // トランザクションを使用して安全にカウントを更新
-                // getDocで現在の値を取得し、incrementで更新
-                const docSnap = await getDoc(counterRef);
-
-                if (docSnap.exists()) {
-                    currentCount = docSnap.data().count;
-                    await updateDoc(counterRef, {
-                        count: increment(1)
-                    });
-                    currentCount++; // 表示用にインクリメント
-                } else {
-                    // ドキュメントが存在しない場合は新規作成
-                    await setDoc(counterRef, { count: 1 });
-                    currentCount = 1;
-                }
-                document.getElementById('viewCount').textContent = currentCount;
-            } catch (error) {
-                console.error("カウンターの更新エラー:", error);
-                document.getElementById('viewCount').textContent = 'エラー';
-            }
-        };
-
-        // ページ読み込み時にFirebaseを初期化し、カウンターを更新
-        document.addEventListener('DOMContentLoaded', async () => {
-            await initializeFirebase();
-            if (auth.currentUser) { // 認証が成功した場合のみカウンターを更新
-                await updateCounter();
-            } else {
-                document.getElementById('viewCount').textContent = '認証エラー';
-            }
-        });
-    </script>
-</body>
-</html>
+    // ページ読み込み時にFirebaseを初期化し、カウンターを更新
+    document.addEventListener('DOMContentLoaded', async () => {
+        await initializeFirebase();
+        // 匿名認証は常に成功すると仮定して、認証チェックは簡略化
+        await updateCounter();
+    });
+</script>
